@@ -215,16 +215,30 @@ def cargar_fila(web, fila, guardar):
     if not guardar:
         return "PRUEBA (no se guardo)"
 
-    # Guardar y aceptar el cartel de confirmacion
-    web.find_element(*SEL_BTN_GUARDAR).click()
-    time.sleep(1)
+    # === GUARDAR ===
+    # Esperamos a que el boton de guardar este realmente listo (no un
+    # sleep fijo), asi no lo apretamos antes de que el formulario termine
+    # de tomar el ultimo dato.
+    boton_guardar = WebDriverWait(web, 10).until(
+        EC.element_to_be_clickable(SEL_BTN_GUARDAR))
+    boton_guardar.click()
+
+    # Le damos un momento a Cohen para procesar.
+    time.sleep(2)
+
+    # Sacamos una foto de como quedo la pantalla despues de guardar,
+    # para poder ver que paso. Se guarda en la carpeta logs.
     try:
-        WebDriverWait(web, 5).until(
-            EC.element_to_be_clickable(SEL_BTN_CONFIRMAR)).click()
-        time.sleep(2)
-        return "OK (guardada)"
+        if not os.path.exists("logs"):
+            os.makedirs("logs")
+        foto = os.path.join(
+            "logs",
+            "guardado_" + str(fila["Comitente"]) + "_"
+            + datetime.now().strftime("%H-%M-%S") + ".png")
+        web.save_screenshot(foto)
+        return "Guardado apretado (foto: " + foto + ")"
     except Exception:
-        return "GUARDADA sin cartel de confirmacion (revisar)"
+        return "Guardado apretado (no se pudo sacar foto)"
 
 
 # =====================================================================
