@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carga de conversiones - QTM</title>
+<style>
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    margin: 0;
+    padding: 20px;
+  }
+  .caja {
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .sub { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
+  .fila-controles {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+  }
+  label { font-size: 13px; color: #cbd5e1; }
+  select, button {
+    font-size: 14px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+  }
+  select { background: #0f172a; color: #e2e8f0; }
+  button {
+    background: #2563eb; color: white; border: none; cursor: pointer;
+  }
+  button:hover { background: #1d4ed8; }
+  button.gris { background: #475569; }
+  button.gris:hover { background: #334155; }
+  button.rojo { background: #dc2626; }
+  button.rojo:hover { background: #b91c1c; }
+  .aviso {
+    padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;
+  }
+  .aviso.prueba { background: #14532d; color: #bbf7d0; }
+  .aviso.real { background: #7f1d1d; color: #fecaca; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #1e293b; }
+  th { color: #94a3b8; font-weight: normal; }
+  .num { text-align: right; }
+  .panel {
+    background: #1e293b; border-radius: 10px; padding: 16px; margin-top: 16px;
+  }
+  pre {
+    background: #0b1220; color: #d1fae5; padding: 14px; border-radius: 8px;
+    font-size: 12px; white-space: pre-wrap; word-break: break-word;
+    max-height: 380px; overflow-y: auto; margin: 0;
+  }
+  .chico { font-size: 12px; color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="caja">
+
+  <h1>Carga de conversiones - QTM</h1>
+  <div class="sub">Herramienta interna. Prepará la planilla y disparás la carga desde acá.</div>
+
+  <div class="fila-controles">
+    <div>
+      <label>¿Quién sos?</label><br>
+      <select id="usuario">
+        <!-- >>> EDITA ACA los mails de QTM: agrega o saca lineas <<< -->
+        <option value="">Elegí tu usuario...</option>
+        <option value="matias@qtmcapital.com.ar">matias@qtmcapital.com.ar</option>
+        <option value="companero1@qtmcapital.com.ar">companero1@qtmcapital.com.ar</option>
+        <option value="companero2@qtmcapital.com.ar">companero2@qtmcapital.com.ar</option>
+      </select>
+    </div>
+
+    <div>
+      <label>&nbsp;</label><br>
+      <button class="gris" onclick="traerFilas()">Traer filas</button>
+    </div>
+
+    <div>
+      <label><input type="checkbox" id="prueba" checked onchange="cambioModo()"> Modo prueba (no guarda nada)</label>
+    </div>
+
+    <div>
+      <label>&nbsp;</label><br>
+      <button id="btnCargar" onclick="cargar()">Probar (no guarda)</button>
+    </div>
+  </div>
+
+  <div id="aviso" class="aviso prueba">
+    Modo PRUEBA activado: el bot completa todo pero no guarda ninguna fila.
+  </div>
+
+  <div id="zonaTabla"></div>
+
+  <div class="panel">
+    <div class="chico">Avance de la carga (se actualiza solo):</div>
+    <pre id="avance">Todavía no arrancó ninguna carga.</pre>
+  </div>
+
+</div>
+
+<script>
+  // La clave la completa el propio servidor cuando entrega la pagina.
+  var CLAVE = "__CLAVE__";
+  var seguimiento = null;
+
+  function cambioModo() {
+    var esPrueba = document.getElementById("prueba").checked;
+    var aviso = document.getElementById("aviso");
+    var boton = document.getElementById("btnCargar");
+    if (esPrueba) {
+      aviso.className = "aviso prueba";
+      aviso.innerHTML = "Modo PRUEBA activado: el bot completa todo pero no guarda ninguna fila.";
+      boton.className = "";
+      boton.innerHTML = "Probar (no guarda)";
+    } else {
+      aviso.className = "aviso real";
+      aviso.innerHTML = "Modo REAL: cada fila se va a GUARDAR de verdad en Cohen.";
+      boton.className = "rojo";
+      boton.innerHTML = "CARGAR DE VERDAD";
+    }
+  }
+
+  function traerFilas() {
+    var zona = document.getElementById("zonaTabla");
+    zona.innerHTML = "<div class='chico'>Trayendo filas de la planilla...</div>";
+
+    fetch("/traer?clave=" + CLAVE).then(function (r) {
+      return r.json();
+    }).then(function (datos) {
+      if (datos.error) {
+        zona.innerHTML = "<div class='chico'>No se pudo: " + datos.error + "</div>";
+        return;
+      }
+      dibujarTabla(datos);
+    }).catch(function () {
+      zona.innerHTML = "<div class='chico'>No se pudo conectar con el servidor.</div>";
+    });
+  }
+
+  function dibujarTabla(datos) {
+    var cols = datos.columnas;
+    var filas = datos.filas;
+
+    var html = "<div class='panel'>";
+    html = html + "<div class='chico'>Filas en la planilla: " + filas.length + "</div>";
+    html = html + "<table><thead><tr>";
+
+    var c = 0;
+    for (c = 0; c < cols.length; c = c + 1) {
+      html = html + "<th>" + cols[c] + "</th>";
+    }
+    html = html + "</tr></thead><tbody>";
+
+    var f = 0;
+    for (f = 0; f < filas.length; f = f + 1) {
+      html = html + "<tr>";
+      for (c = 0; c < cols.length; c = c + 1) {
+        var valor = filas[f][cols[c]];
+        var clase = "";
+        if (cols[c] === "Importe" || cols[c] === "Comitente" || cols[c] === "VALIDADOR") {
+          clase = " class='num'";
+        }
+        html = html + "<td" + clase + ">" + valor + "</td>";
+      }
+      html = html + "</tr>";
+    }
+    html = html + "</tbody></table></div>";
+
+    document.getElementById("zonaTabla").innerHTML = html;
+  }
+
+  function cargar() {
+    var usuario = document.getElementById("usuario").value;
+    if (usuario === "") {
+      alert("Primero elegí quién sos en la lista de arriba.");
+      return;
+    }
+
+    var esPrueba = document.getElementById("prueba").checked;
+
+    var pregunta;
+    if (esPrueba) {
+      pregunta = "Vas a correr una PRUEBA (no se guarda nada). ¿Seguimos?";
+    } else {
+      pregunta = "ATENCION: esto GUARDA de verdad en Cohen. ¿Estás seguro?";
+    }
+    if (!confirm(pregunta)) {
+      return;
+    }
+
+    document.getElementById("avance").innerHTML = "Arrancando...";
+
+    var cuerpo = JSON.stringify({
+      clave: CLAVE,
+      usuario: usuario,
+      prueba: esPrueba
+    });
+
+    fetch("/cargar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: cuerpo
+    }).then(function (r) {
+      return r.json();
+    }).then(function (resp) {
+      if (resp.estado === "ocupado") {
+        document.getElementById("avance").innerHTML = "Ya hay una carga en curso. Esperá a que termine.";
+        return;
+      }
+      arrancarSeguimiento();
+    }).catch(function () {
+      document.getElementById("avance").innerHTML = "No se pudo conectar con el servidor.";
+    });
+  }
+
+  function arrancarSeguimiento() {
+    if (seguimiento !== null) {
+      clearInterval(seguimiento);
+    }
+    seguimiento = setInterval(consultarEstado, 2000);
+    consultarEstado();
+  }
+
+  function consultarEstado() {
+    fetch("/estado?clave=" + CLAVE).then(function (r) {
+      return r.json();
+    }).then(function (datos) {
+      if (datos.error) {
+        return;
+      }
+      var caja = document.getElementById("avance");
+      if (datos.texto === "") {
+        caja.innerHTML = "Arrancando...";
+      } else {
+        caja.innerHTML = datos.texto;
+        caja.scrollTop = caja.scrollHeight;
+      }
+      if (!datos.corriendo && seguimiento !== null) {
+        clearInterval(seguimiento);
+        seguimiento = null;
+      }
+    }).catch(function () {
+      // si falla una consulta, no pasa nada: reintenta a los 2 segundos
+    });
+  }
+</script>
+</body>
+</html>

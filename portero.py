@@ -24,7 +24,7 @@ dejamos como servicio. Por ahora, para probar, con eso alcanza.
 import os
 import subprocess
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import pandas as pd
 from dotenv import load_dotenv
@@ -57,6 +57,16 @@ def esta_corriendo():
 def clave_ok(valor):
     """Chequea que quien golpea la puerta traiga la clave correcta."""
     return valor == CLAVE_PORTERO
+
+
+@app.route("/")
+def pagina():
+    """Entrega la pagina, con la clave ya puesta adentro (no la escribe nadie)."""
+    f = open("pagina.html", "r", encoding="utf-8")
+    html = f.read()
+    f.close()
+    html = html.replace("__CLAVE__", CLAVE_PORTERO)
+    return Response(html, mimetype="text/html")
 
 
 @app.route("/traer")
