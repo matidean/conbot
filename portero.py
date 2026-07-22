@@ -27,6 +27,10 @@ import subprocess
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
+from dotenv import load_dotenv
+
+# Leemos el archivo .env para tener a mano la clave del portero.
+load_dotenv()
 
 # Reusamos la direccion de la planilla del propio bot, asi no la repetimos.
 import cargar_conversiones as bot
