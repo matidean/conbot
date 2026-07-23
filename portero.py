@@ -41,6 +41,9 @@ CORS(app)  # deja que la pagina (que esta en otra direccion) le hable
 # La clave que comparten la pagina y el portero. Se lee del archivo .env.
 CLAVE_PORTERO = os.getenv("CLAVE_PORTERO", "cambiame")
 
+# La clave para ENTRAR a la pagina (la que se pide al abrirla). Del .env.
+CLAVE_ACCESO = os.getenv("CLAVE_ACCESO", "cambiame")
+
 # Donde el bot va escribiendo el avance en vivo mientras trabaja.
 ARCHIVO_VIVO = os.path.join("logs", "en_vivo.txt")
 
@@ -52,6 +55,17 @@ def esta_corriendo():
     """Devuelve True si hay un bot trabajando en este momento."""
     p = _proceso["popen"]
     return p is not None and p.poll() is None
+
+
+@app.before_request
+def exigir_clave_de_acceso():
+    """Le pide la clave a cualquiera que abra la pagina. Sin clave, no entra."""
+    permiso = request.authorization
+    if permiso is None or permiso.password != CLAVE_ACCESO:
+        return Response(
+            "Necesitas la clave de QTM para entrar.",
+            401,
+            {"WWW-Authenticate": 'Basic realm="Carga de conversiones QTM"'})
 
 
 def clave_ok(valor):
