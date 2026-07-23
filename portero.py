@@ -153,6 +153,29 @@ def estado():
     return jsonify({"corriendo": esta_corriendo(), "texto": texto})
 
 
+@app.route("/historial")
+def historial():
+    """Devuelve el registro de todas las corridas, de la mas nueva a la mas vieja."""
+    if not clave_ok(request.args.get("clave")):
+        return jsonify({"error": "no autorizado"}), 401
+
+    corridas = []
+    if os.path.exists("logs"):
+        nombres = []
+        for n in os.listdir("logs"):
+            if n.startswith("carga_") and n.endswith(".txt"):
+                nombres.append(n)
+        nombres.sort(reverse=True)  # el nombre trae la fecha, asi que la mas nueva primero
+        for n in nombres:
+            ruta = os.path.join("logs", n)
+            f = open(ruta, "r", encoding="utf-8")
+            texto = f.read()
+            f.close()
+            corridas.append({"nombre": n, "texto": texto})
+
+    return jsonify({"corridas": corridas})
+
+
 if __name__ == "__main__":
     # Escucha en el puerto 5000, disponible para afuera.
     app.run(host="0.0.0.0", port=5000)
